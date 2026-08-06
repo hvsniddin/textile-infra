@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/hvsniddin/textile-frontend:${IMAGE_TAG:-latest}
+    image: ghcr.io/hvsniddin/textile-front:${IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "127.0.0.1:5173:80"
