@@ -1,0 +1,122 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    depends_on:
+      - frontend
+      - api
+      - bot
+    networks:
+      - textile-network
+
+  frontend:
+    image: your-registry/textile-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    expose:
+      - "5173"
+    env_file:
+      - .env
+    networks:
+      - textile-network
+
+  api:
+    image: your-registry/textile-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - textile-network
+
+  bot:
+    image: your-registry/textile-bot:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - textile-network
+
+  celery-worker:
+    image: your-registry/textile-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: celery -A config worker --loglevel=INFO
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - textile-network
+
+  celery-beat:
+    image: your-registry/textile-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: celery -A config beat --loglevel=INFO
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - textile-network
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - textile-network
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - textile-network
+
+networks:
+  textile-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
