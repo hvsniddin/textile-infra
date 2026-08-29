@@ -6,3 +6,5 @@
 .junie
 
 compose.dev.yaml
+dev.*
+*.sql
